@@ -1,5 +1,11 @@
 # https://www.geeksforgeeks.org/morse-code-translator-python/
 
+from TwoWayDict import TwoWayDict
+
+
+            
+
+
 MORSE_CODE_DICT = { 'A':'.-', 'B':'-...', 
                     'C':'-.-.', 'D':'-..', 'E':'.', 
                     'F':'..-.', 'G':'--.', 'H':'....', 
@@ -16,7 +22,23 @@ MORSE_CODE_DICT = { 'A':'.-', 'B':'-...',
                     '?':'..--..', '/':'-..-.', '-':'-....-', 
                     '(':'-.--.', ')':'-.--.-'} 
 
-# Function to encrypt the string 
+# https://docs.python.org/3/tutorial/classes.html
+class MorseTranslater():
+    myDict = TwoWayDict()
+
+    def __init__(self):
+
+        # https://realpython.com/iterate-through-dictionary-python/
+        for key, value in MORSE_CODE_DICT.items() :
+            self.myDict[key] = value
+    
+    def translate(self, message):
+        return self.myDict[message]
+    
+
+
+
+""" # Function to encrypt the string 
 # according to the morse code chart 
 def encrypt(message): 
     cipher = '' 
@@ -73,4 +95,4 @@ def decrypt(message):
                 .values()).index(citext)] 
                 citext = '' 
   
-    return decipher 
+    return decipher  """
