@@ -29,14 +29,12 @@ letter_gap_length = 3 * time_unit # in ms
 word_gap_length = 7 * time_unit # in ms
 
 # MQTT Constants
-BROKER = 'iot.cs.calvin.edu'
-USERNAME = "cs300" # Put broker username here
-PASSWORD = "safeIoT" # Put broker password here
-PORT = 8883
+BROKER = 'mqtt.eclipse.org'
+PORT = 1883
 QOS = 0
-DELAY = 5.0
-TOPIC = 'ths6/morse'
-CERTS = '/etc/ssl/certs/ca-certificates.crt'
+DELAY = 1.0
+BUTTON_TOPIC = 'ths6/morse'
+LED_TOPIC = 'ths6/LED'
 
 # State Constants
 WAIT = "wait_state"
@@ -57,32 +55,65 @@ spaceEligible = False
 # Callback when a connection has been established with the MQTT broker
 def on_connect(client, userdata, flags, rc):
  if rc==0:
-    print('Connected to',BROKER)
+    print('Connected to', BROKER)
  else:
     print('Connection to',BROKER,'failed. Return code=',rc)
     os._exit(1)
+
+def flashLED(plaintext):
+    global translater
+    print("Flashing " + plaintext)
+    for char in plaintext:
+        
+        if char != ' ':
+            print(char)
+            morsePattern = translater.translate(char)
+            print("Translated")
+            print(str(morsePattern))
+            for ditDat in morsePattern:
+                if ditDat == '-':
+                    GPIO.output(led, True)
+                    time.sleep(long_char_length / s_ms_conversion)
+                    GPIO.output(led, False)
+                elif ditDat == '.':
+                    GPIO.output(led, True)
+                    time.sleep(short_char_length / s_ms_conversion)
+                    GPIO.output(led, False)
+                else:
+                    print("ERROR: pattern off")
+                time.sleep(short_char_length / s_ms_conversion)
+            time.sleep(letter_gap_length / s_ms_conversion)
+        else:
+            time.sleep((word_gap_length - letter_gap_length) / s_ms_conversion)
+
+#def on_publish(client, userdata, mid):
+#    print(message + " published on " + BUTTON_TOPIC)
+
+def on_message(client, data, msg):
+    if str(msg.topic) == LED_TOPIC:
+        print("Received message: " + str(msg.payload)[2:-1])
+        flashLED(str(msg.payload)[2:-1].upper())
 
 
 # Translate and add the entered pattern
 def append_char():
     global currentCharStr, message, spaceEligible, client
     try:
-        message += translater.translate(currentCharStr)
+        message = translater.translate(currentCharStr)
         print(currentCharStr + " -> " + message)
         currentCharStr = ""
         spaceEligible = True
-        client.publish(TOPIC, message)
+        client.publish(BUTTON_TOPIC, message)
     except KeyError: # key not found in dictionary because the entered pattern is wrong
         print("ERROR: Invalid character entered")
         currentCharStr = ""
 
 # Add a space to the message
 def append_space():
-    global message, spaceEligible, client
-    message += " "
+    global spaceEligible, client
     print("word ended")
     spaceEligible = False
-    client.publish(TOPIC, message)
+    client.publish(BUTTON_TOPIC, " ")
 
 # Toggle buttonIsPressed boolean
 def toggle_buttonIsPressed():
@@ -136,20 +167,17 @@ GPIO.add_event_detect(reset_button, GPIO.RISING, callback=reset_button_callback,
 # Setup MQTT client and callbacks
 client = mqtt.Client()
 client.on_connect = on_connect
+#client.on_publish = on_publish
+client.on_message = on_message
+
 # Securely connect to MQTT broker
-client.username_pw_set(USERNAME, password=PASSWORD)
-client.tls_set(CERTS)
 client.connect(BROKER, PORT, 60)
+client.subscribe(LED_TOPIC, QOS)
 client.loop_start()
 
 # Main loop
 try:
     while(True):
-        GPIO.output(led, True)
-        time.sleep(time_unit / (s_ms_conversion)) # on for a time unit
-        GPIO.output(led, False)
-        time.sleep(time_unit / (s_ms_conversion)) # off for a time unit
-
         timeBetweenPresses = (time.time() - endTime) * s_ms_conversion
 
         if (not buttonIsPressed) and (currentCharStr):
@@ -166,3 +194,4 @@ except KeyboardInterrupt: # Allow for nice shutdown when someone presses ^C
     print("\nExiting...")
 finally:
     GPIO.cleanup()
+    client.disconnect()
